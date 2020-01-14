@@ -15,12 +15,6 @@ pub fn parse_expression(input: &str) -> Expression {
 		.expr();
 }
 
-const ADD: (u32, u32, BinaryOp) = (1, 1, BinaryOp::Plus);
-const MINUS: (u32, u32, BinaryOp) = (1, 1, BinaryOp::Minus);
-const MULTIPLY: (u32, u32, BinaryOp) = (2, 2, BinaryOp::Multiply);
-const DIVIDE: (u32, u32, BinaryOp) = (2, 2, BinaryOp::Divide);
-const DICE: (u32, u32, BinaryOp) = (4, 3, BinaryOp::Dice);
-
 const UNARY_PRIORITY: u32 = 3;
 
 impl<'source> Parser<&'source str> {
@@ -35,11 +29,11 @@ impl<'source> Parser<&'source str> {
 			let op = self.peek_kind();
 
 			let (limit, new_precedence, op) = match op {
-				TokenKind::Plus => ADD,
-				TokenKind::Dash => MINUS,
-				TokenKind::Asterisk => MULTIPLY,
-				TokenKind::ForwardSlash => DIVIDE,
-				TokenKind::Dice => DICE,
+				TokenKind::Plus => (1, 1, BinaryOp::Plus),
+				TokenKind::Dash => (1, 1, BinaryOp::Minus),
+				TokenKind::Asterisk => (2, 2, BinaryOp::Multiply),
+				TokenKind::ForwardSlash => (2, 2, BinaryOp::Divide),
+				TokenKind::Dice => (4, 3, BinaryOp::Dice),
 				_ => break,
 			};
 
