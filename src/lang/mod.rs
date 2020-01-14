@@ -29,7 +29,7 @@ impl<'source> Parser<&'source str> {
 			let op = self.peek_kind();
 
 			let (limit, new_precedence, op) = match op {
-				TokenKind::Plus => (1, 1, BinaryOp::Plus),
+				TokenKind::Plus => (1, 1, BinaryOp::Add),
 				TokenKind::Dash => (1, 1, BinaryOp::Minus),
 				TokenKind::Asterisk => (2, 2, BinaryOp::Multiply),
 				TokenKind::ForwardSlash => (2, 2, BinaryOp::Divide),
@@ -115,7 +115,7 @@ impl Debug for Expression {
 
 pub enum BinaryOp {
 	Dice,
-	Plus,
+	Add,
 	Minus,
 	Multiply,
 	Divide,
@@ -125,7 +125,7 @@ impl Debug for BinaryOp {
 	fn fmt(&self, f: &mut Formatter<'_>) -> FResult {
 		match self {
 			BinaryOp::Dice => f.write_char('d'),
-			BinaryOp::Plus => f.write_char('+'),
+			BinaryOp::Add => f.write_char('+'),
 			BinaryOp::Minus => f.write_char('-'),
 			BinaryOp::Multiply => f.write_char('*'),
 			BinaryOp::Divide => f.write_char('/'),

@@ -57,7 +57,7 @@ pub fn evaluate_expression(expression: &Expression) -> i64 {
 					BinaryOp::Multiply => left * right,
 					BinaryOp::Divide => left / right,
 					BinaryOp::Minus => left - right,
-					BinaryOp::Plus => left + right,
+					BinaryOp::Add => left + right,
 				}
 			} else {
 				unreachable!()
@@ -113,7 +113,7 @@ pub fn fold_expression(expression: &mut Expression) {
 				right.visit_mut(self);
 
 				match op {
-					BinaryOp::Plus => (),
+					BinaryOp::Add => (),
 					BinaryOp::Minus => (),
 					BinaryOp::Multiply => (),
 					BinaryOp::Divide => (),
@@ -123,7 +123,7 @@ pub fn fold_expression(expression: &mut Expression) {
 				if let Some(left) = extract_number(left) {
 					if let Some(right) = extract_number(right) {
 						let result = match op {
-							BinaryOp::Plus => left + right,
+							BinaryOp::Add => left + right,
 							BinaryOp::Minus => left - right,
 							BinaryOp::Multiply => left * right,
 							BinaryOp::Divide => left / right,
