@@ -15,6 +15,12 @@ pub fn parse_expression(input: &str) -> Expression {
 		.expr();
 }
 
+const ADD: (u32, u32, BinaryOp) = (1, 1, BinaryOp::Plus);
+const MINUS: (u32, u32, BinaryOp) = (1, 1, BinaryOp::Minus);
+const MULTIPLY: (u32, u32, BinaryOp) = (2, 2, BinaryOp::Multiply);
+const DIVIDE: (u32, u32, BinaryOp) = (2, 2, BinaryOp::Divide);
+const DICE: (u32, u32, BinaryOp) = (4, 3, BinaryOp::Dice);
+
 const UNARY_PRIORITY: u32 = 3;
 
 impl<'source> Parser<&'source str> {
@@ -28,12 +34,12 @@ impl<'source> Parser<&'source str> {
 		loop {
 			let op = self.peek_kind();
 
-			let (limit, value, op) = match op {
-				TokenKind::Plus => (1, 1, BinaryOp::Plus),
-				TokenKind::Dash => (1, 1, BinaryOp::Minus),
-				TokenKind::Asterisk => (2, 2, BinaryOp::Multiply),
-				TokenKind::ForwardSlash => (2, 2, BinaryOp::Divide),
-				TokenKind::Dice => (4, 3, BinaryOp::Dice),
+			let (limit, new_precedence, op) = match op {
+				TokenKind::Plus => ADD,
+				TokenKind::Dash => MINUS,
+				TokenKind::Asterisk => MULTIPLY,
+				TokenKind::ForwardSlash => DIVIDE,
+				TokenKind::Dice => DICE,
 				_ => break,
 			};
 
@@ -43,11 +49,7 @@ impl<'source> Parser<&'source str> {
 
 			self.take_kind();
 
-			let mut right = self.expr_with_precedence(value);
-
-//			if !left.is_number() && right.is_number() {
-//				std::mem::swap(&mut left, &mut right);
-//			}
+			let mut right = self.expr_with_precedence(new_precedence);
 
 			left = Expression::Binary(op, Box::new(left), Box::new(right));
 		}
@@ -97,14 +99,14 @@ pub enum Expression {
 	Constant(i64),
 }
 
-//impl Expression {
-//	pub fn is_number(&self) -> bool {
-//		match self {
-//			Expression::Constant(..) => true,
-//			_ => false,
-//		}
-//	}
-//}
+impl Expression {
+	pub fn is_number(&self) -> bool {
+		match self {
+			Expression::Constant(..) => true,
+			_ => false,
+		}
+	}
+}
 
 impl Debug for Expression {
 	fn fmt(&self, f: &mut Formatter<'_>) -> FResult {
@@ -169,11 +171,11 @@ pub trait VisitorMut {
 	fn visit_pre(&mut self, expression: &mut Expression) {}
 	fn visit_post(&mut self, expression: &mut Expression) {}
 
-	fn visit_binary(&mut self, expr: &mut Expression) -> Self::Result;
+	fn visit_binary(&mut self, expression: &mut Expression) -> Self::Result;
 
-	fn visit_unary(&mut self, expr: &mut Expression) -> Self::Result;
+	fn visit_unary(&mut self, expression: &mut Expression) -> Self::Result;
 
-	fn visit_constant(&mut self, expr: &mut Expression) -> Self::Result;
+	fn visit_constant(&mut self, expression: &mut Expression) -> Self::Result;
 }
 
 impl Expression {
@@ -205,26 +207,3 @@ impl Expression {
 		result
 	}
 }
-
-
-//pub fn visit<V>(&self, visitor: &mut V) -> V::Result where V: Visitor {
-//	let pre = visitor.visit_pre(self);
-//
-//	self.walk(visitor);
-//
-//	let post = visitor.visit_post(self);
-//
-//	visitor.merge(pre, post)
-//}
-//
-
-//
-//pub fn visit_mut<V>(&mut self, visitor: &mut V) -> V::Result where V: VisitorMut {
-//	let pre = visitor.visit_pre(self);
-//
-//	self.walk_mut(visitor);
-//
-//	let post = visitor.visit_post(self);
-//
-//	visitor.merge(pre, post)
-//}
