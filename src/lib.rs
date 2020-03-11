@@ -25,18 +25,18 @@ pub fn evaluate_expression(expression: &Expression) -> i64 {
 				let left = left.visit(self);
 				let right = right.visit(self);
 
-				if left == 0 {
-					return 0;
-				}
-				if left < 0 {
-					panic!("Cannot roll negative number of dice. (left: {}, right: {})", left, right);
-				}
-				if right < 1 {
-					panic!("Cannot roll die with zero or negative faces. (left: {}, right: {})", left, right);
-				}
-
 				match op {
 					BinaryOp::Dice => {
+						if left == 0 {
+							return 0;
+						}
+						if left < 0 {
+							panic!("Cannot roll negative number of dice. (left: {}, right: {})", left, right);
+						}
+						if right < 1 {
+							panic!("Cannot roll die with zero or negative faces. (left: {}, right: {})", left, right);
+						}
+
 						let between = Uniform::new_inclusive(1, right);
 						let mut rng = rand::thread_rng();
 
