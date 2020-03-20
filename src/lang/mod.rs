@@ -6,6 +6,7 @@ pub use logos::Logos;
 
 pub use crate::lang::lexer::TokenKind;
 pub use crate::lang::parser::Parser;
+pub use crate::lang::parser::Span;
 
 mod parser;
 mod lexer;
@@ -43,9 +44,11 @@ impl<'source> Parser<&'source str> {
 
 			self.take_kind();
 
-			let mut right = self.expr_with_precedence(new_precedence);
+			let right = self.expr_with_precedence(new_precedence);
 
-			left = Expression::Binary(op, Box::new(left), Box::new(right));
+			let span = left.span.merge(right.span);
+
+			left = Expression::new_binary(span, op, Box::new(left), Box::new(right));
 		}
 
 		left
@@ -60,55 +63,94 @@ impl<'source> Parser<&'source str> {
 
 				let expression = Box::new(self.expr_with_precedence(UNARY_PRIORITY));
 
-				Expression::Unary(UnaryOp::Negative, expression)
+				Expression::new_unary(expression.span, UnaryOp::Negative, expression)
 			}
 			TokenKind::Number => {
-				let number = self.slice()
+				let (_, span, slice) = self.take_token();
+				let number = slice
 					.parse()
 					.unwrap();
 
-				self.take_kind();
-
-				Expression::Constant(number)
+				Expression::new_constant(span, number)
 			}
 			TokenKind::LeftParenthesis => {
-				self.take_kind();
+				let (_, start_span, _) = self.take_token();
 
-				let expression = self.expr();
+				let expression = Box::new(self.expr());
 
-				self.expect(TokenKind::RightParenthesis).unwrap();
-				expression
+				let (_, end_span, _) = self.expect(TokenKind::RightParenthesis).unwrap();
+				Expression::new_tree(start_span.merge(end_span), expression)
 			}
 			_ => {
-				let (kind, range) = self.peek_token();
+				let (kind, range, _) = self.peek_token();
 				panic!("Unexpected token \"{:?}\" @ {:?}", kind, range);
 			}
 		}
 	}
 }
 
-pub enum Expression {
+#[derive(Debug)]
+pub struct Expression {
+	pub span: Span,
+	pub kind: ExpressionKind,
+}
+
+pub enum ExpressionKind {
 	Binary(BinaryOp, Box<Expression>, Box<Expression>),
 	Unary(UnaryOp, Box<Expression>),
+	Tree(Box<Expression>),
 	Constant(i64),
 }
 
 impl Expression {
+	pub fn new_binary(span: Span, binary_op: BinaryOp, left: Box<Expression>, right: Box<Expression>) -> Self {
+		let kind = ExpressionKind::Binary(binary_op, left, right);
+		Expression {
+			span,
+			kind,
+		}
+	}
+
+	pub fn new_unary(span: Span, unary_op: UnaryOp, expr: Box<Expression>) -> Self {
+		let kind = ExpressionKind::Unary(unary_op, expr);
+		Expression {
+			span,
+			kind,
+		}
+	}
+
+	pub fn new_constant(span: Span, constant: i64) -> Self {
+		let kind = ExpressionKind::Constant(constant);
+		Expression {
+			span,
+			kind,
+		}
+	}
+
+	pub fn new_tree(span: Span, expr: Box<Expression>) -> Self {
+		let kind = ExpressionKind::Tree(expr);
+		Expression {
+			span,
+			kind,
+		}
+	}
+
 	pub fn is_number(&self) -> bool {
-		match self {
-			Expression::Constant(..) => true,
+		match &self.kind {
+			ExpressionKind::Constant(..) => true,
 			_ => false,
 		}
 	}
 }
 
-impl Debug for Expression {
+impl Debug for ExpressionKind {
 	fn fmt(&self, f: &mut Formatter<'_>) -> FResult {
-		match self {
-			Expression::Binary(BinaryOp::Dice, left, right) => write!(f, "({:?}d{:?})", left, right),
-			Expression::Binary(op, left, right) => write!(f, "({:?} {:?} {:?})", left, op, right),
-			Expression::Unary(op, expr) => write!(f, "({:?}{:?})", op, expr),
-			Expression::Constant(value) => write!(f, "{}", value),
+		match &self {
+			ExpressionKind::Binary(BinaryOp::Dice, left, right) => write!(f, "({:?}d{:?})", left, right),
+			ExpressionKind::Binary(op, left, right) => write!(f, "({:?} {:?} {:?})", left, op, right),
+			ExpressionKind::Unary(op, expr) => write!(f, "({:?}{:?})", op, expr),
+			ExpressionKind::Tree(expr) => write!(f, "({:?})", expr),
+			ExpressionKind::Constant(value) => write!(f, "{}", value),
 		}
 	}
 }
@@ -156,6 +198,8 @@ pub trait Visitor {
 
 	fn visit_unary(&mut self, expression: &Expression) -> Self::Result;
 
+	fn visit_tree(&mut self, expression: &Expression) -> Self::Result;
+
 	fn visit_constant(&mut self, expression: &Expression) -> Self::Result;
 }
 
@@ -169,6 +213,8 @@ pub trait VisitorMut {
 
 	fn visit_unary(&mut self, expression: &mut Expression) -> Self::Result;
 
+	fn visit_tree(&mut self, expression: &mut Expression) -> Self::Result;
+
 	fn visit_constant(&mut self, expression: &mut Expression) -> Self::Result;
 }
 
@@ -176,10 +222,11 @@ impl Expression {
 	pub fn visit<V>(&self, visitor: &mut V) -> V::Result where V: Visitor {
 		visitor.visit_pre(self);
 
-		let result = match self {
-			Expression::Binary(..) => visitor.visit_binary(self),
-			Expression::Unary(..) => visitor.visit_unary(self),
-			Expression::Constant(..) => visitor.visit_constant(self),
+		let result = match &self.kind {
+			ExpressionKind::Binary(..) => visitor.visit_binary(self),
+			ExpressionKind::Unary(..) => visitor.visit_unary(self),
+			ExpressionKind::Tree(..) => visitor.visit_tree(self),
+			ExpressionKind::Constant(..) => visitor.visit_constant(self),
 		};
 
 		visitor.visit_post(self);
@@ -190,10 +237,11 @@ impl Expression {
 	pub fn visit_mut<V>(&mut self, visitor: &mut V) -> V::Result where V: VisitorMut {
 		visitor.visit_pre(self);
 
-		let result = match self {
-			Expression::Binary(..) => visitor.visit_binary(self),
-			Expression::Unary(..) => visitor.visit_unary(self),
-			Expression::Constant(..) => visitor.visit_constant(self),
+		let result = match &self.kind {
+			ExpressionKind::Binary(..) => visitor.visit_binary(self),
+			ExpressionKind::Unary(..) => visitor.visit_unary(self),
+			ExpressionKind::Tree(..) => visitor.visit_tree(self),
+			ExpressionKind::Constant(..) => visitor.visit_constant(self),
 		};
 
 		visitor.visit_post(self);

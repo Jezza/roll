@@ -1,27 +1,28 @@
+#[warn(rust_2018_idioms)]
+
 use lang::BinaryOp;
 use lang::Expression;
-use lang::parse_expression;
+use lang::ExpressionKind;
 use lang::UnaryOp;
-
-use crate::lang::VisitorMut;
 
 pub mod lang;
 
 pub fn evaluate_str(input: &str) -> i64 {
 	let expression = lang::parse_expression(input);
-	evaluate_expression(&expression)
+	evaluate_expression(input, &expression)
 }
 
-pub fn evaluate_expression(expression: &Expression) -> i64 {
+pub fn evaluate_expression(input: &str, expression: &Expression) -> i64 {
 	use rand::distributions::Uniform;
 	use rand::distributions::Distribution;
 
-	struct Evaluator;
-	impl lang::Visitor for Evaluator {
+	struct Evaluator<'a>(&'a str);
+
+	impl<'a> lang::Visitor for Evaluator<'a> {
 		type Result = i64;
 
 		fn visit_binary(&mut self, expression: &Expression) -> Self::Result {
-			if let Expression::Binary(op, left, right) = expression {
+			if let ExpressionKind::Binary(op, left, right) = &expression.kind {
 				let left = left.visit(self);
 				let right = right.visit(self);
 
@@ -65,7 +66,7 @@ pub fn evaluate_expression(expression: &Expression) -> i64 {
 		}
 
 		fn visit_unary(&mut self, expression: &Expression) -> Self::Result {
-			if let Expression::Unary(op, expr) = expression {
+			if let ExpressionKind::Unary(op, expr) = &expression.kind {
 				let result = expr.visit(self);
 
 				match op {
@@ -76,8 +77,16 @@ pub fn evaluate_expression(expression: &Expression) -> i64 {
 			}
 		}
 
+		fn visit_tree(&mut self, expression: &Expression) -> Self::Result {
+			if let ExpressionKind::Tree(expr) = &expression.kind {
+				expr.visit(self)
+			} else {
+				unreachable!()
+			}
+		}
+
 		fn visit_constant(&mut self, expression: &Expression) -> Self::Result {
-			if let Expression::Constant(value) = expression {
+			if let ExpressionKind::Constant(value) = &expression.kind {
 				*value
 			} else {
 				unreachable!()
@@ -85,14 +94,14 @@ pub fn evaluate_expression(expression: &Expression) -> i64 {
 		}
 	}
 
-	expression.visit(&mut Evaluator)
+	expression.visit(&mut Evaluator(input))
 }
 
 pub fn fold_expression(expression: &mut Expression) {
 	fn extract_number(expression: &Expression) -> Option<i64> {
-		match expression {
-			Expression::Constant(value) => Some(*value),
-			Expression::Unary(UnaryOp::Negative, expr) => {
+		match &expression.kind {
+			ExpressionKind::Constant(value) => Some(*value),
+			ExpressionKind::Unary(UnaryOp::Negative, expr) => {
 				if let Some(value) = extract_number(expr) {
 					Some(-value)
 				} else {
@@ -108,7 +117,7 @@ pub fn fold_expression(expression: &mut Expression) {
 		type Result = ();
 
 		fn visit_binary(&mut self, expression: &mut Expression) {
-			if let Expression::Binary(op, left, right) = expression {
+			if let ExpressionKind::Binary(op, left, right) = &mut expression.kind {
 				left.visit_mut(self);
 				right.visit_mut(self);
 
@@ -130,8 +139,7 @@ pub fn fold_expression(expression: &mut Expression) {
 							_ => unreachable!(),
 						};
 
-//							((9 - (11 + (1d6))) - 1)
-						*expression = Expression::Constant(result);
+						expression.kind = ExpressionKind::Constant(result);
 					}
 				}
 			} else {
@@ -140,14 +148,25 @@ pub fn fold_expression(expression: &mut Expression) {
 		}
 
 		fn visit_unary(&mut self, expression: &mut Expression) {
-			if let Expression::Unary(UnaryOp::Negative, expr) = expression {
+			if let ExpressionKind::Unary(UnaryOp::Negative, expr) = &mut expression.kind {
 				expr.visit_mut(self);
 
-				if let Expression::Unary(UnaryOp::Negative, expr) = expr.as_mut() {
-					let expr = expr.as_mut();
-					let new = std::mem::replace(expr, Expression::Constant(0));
-					*expression = new;
+				if let ExpressionKind::Unary(UnaryOp::Negative, expr) = &mut expr.as_mut().kind {
+
+					let span = expression.span.merge(expr.span);
+
+					let kind = std::mem::replace(&mut expr.as_mut().kind, ExpressionKind::Constant(0));
+					expression.kind = kind;
+					expression.span = span;
 				}
+			} else {
+				unreachable!()
+			}
+		}
+
+		fn visit_tree(&mut self, expression: &mut Expression) {
+			if let ExpressionKind::Tree(expr) = &mut expression.kind {
+				expr.visit_mut(self)
 			} else {
 				unreachable!()
 			}

@@ -1,3 +1,4 @@
+use roll::evaluate_str;
 
 fn main() {
 	// @TODO jezza - 13 Jan. 2020: Add custom spans so we know the source range for each expression. 1d6 + 3d(1d9 + 1d10 + 5)
@@ -28,4 +29,7 @@ fn main() {
 //
 //	let result = evaluate_expression(&expression);
 //	println!("Result: {}", result);
+
+	let result = evaluate_str("2d(2 * 2)");
+	println!("Result: {}", result);
 }
