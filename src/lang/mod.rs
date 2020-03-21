@@ -187,18 +187,45 @@ impl Debug for UnaryOp {
 	}
 }
 
-
-pub trait Visitor {
+pub trait Visitor: Sized {
 	type Result;
 
 	fn visit_pre(&mut self, expression: &Expression) {}
 	fn visit_post(&mut self, expression: &Expression) {}
 
-	fn visit_binary(&mut self, expression: &Expression) -> Self::Result;
+	fn scan(&mut self, expression: &Expression) -> Self::Result {
+		expression.visit(self)
+	}
 
-	fn visit_unary(&mut self, expression: &Expression) -> Self::Result;
+	fn reduce(&mut self, left: Self::Result, right: Self::Result) -> Self::Result {
+		left
+	}
 
-	fn visit_tree(&mut self, expression: &Expression) -> Self::Result;
+	fn visit_binary(&mut self, expression: &Expression) -> Self::Result {
+		if let ExpressionKind::Binary(op, left, right) = &expression.kind {
+			let left_result = self.scan(left);
+			let right_result = self.scan(right);
+			self.reduce(left_result, right_result)
+		} else {
+			unreachable!()
+		}
+	}
+
+	fn visit_unary(&mut self, expression: &Expression) -> Self::Result {
+		if let ExpressionKind::Unary(op, expr) = &expression.kind {
+			self.scan(expr)
+		} else {
+			unreachable!()
+		}
+	}
+
+	fn visit_tree(&mut self, expression: &Expression) -> Self::Result {
+		if let ExpressionKind::Tree(expr) = &expression.kind {
+			self.scan(expr)
+		} else {
+			unreachable!()
+		}
+	}
 
 	fn visit_constant(&mut self, expression: &Expression) -> Self::Result;
 }
@@ -209,17 +236,45 @@ pub trait VisitorMut {
 	fn visit_pre(&mut self, expression: &mut Expression) {}
 	fn visit_post(&mut self, expression: &mut Expression) {}
 
-	fn visit_binary(&mut self, expression: &mut Expression) -> Self::Result;
+	fn scan(&mut self, expression: &mut Expression) -> Self::Result {
+		expression.visit_mut(self)
+	}
 
-	fn visit_unary(&mut self, expression: &mut Expression) -> Self::Result;
+	fn reduce(&mut self, left: Self::Result, right: Self::Result) -> Self::Result {
+		left
+	}
 
-	fn visit_tree(&mut self, expression: &mut Expression) -> Self::Result;
+	fn visit_binary(&mut self, expression: &mut Expression) -> Self::Result {
+		if let ExpressionKind::Binary(op, left, right) = &mut expression.kind {
+			let left_result = self.scan(left);
+			let right_result = self.scan(right);
+			self.reduce(left_result, right_result)
+		} else {
+			unreachable!()
+		}
+	}
+
+	fn visit_unary(&mut self, expression: &mut Expression) -> Self::Result {
+		if let ExpressionKind::Unary(op, expr) = &mut expression.kind {
+			self.scan(expr)
+		} else {
+			unreachable!()
+		}
+	}
+
+	fn visit_tree(&mut self, expression: &mut Expression) -> Self::Result {
+		if let ExpressionKind::Tree(expr) = &mut expression.kind {
+			self.scan(expr)
+		} else {
+			unreachable!()
+		}
+	}
 
 	fn visit_constant(&mut self, expression: &mut Expression) -> Self::Result;
 }
 
 impl Expression {
-	pub fn visit<V>(&self, visitor: &mut V) -> V::Result where V: Visitor {
+	pub fn visit<V: ?Sized>(&self, visitor: &mut V) -> V::Result where V: Visitor {
 		visitor.visit_pre(self);
 
 		let result = match &self.kind {
@@ -234,7 +289,7 @@ impl Expression {
 		result
 	}
 
-	pub fn visit_mut<V>(&mut self, visitor: &mut V) -> V::Result where V: VisitorMut {
+	pub fn visit_mut<V: ?Sized>(&mut self, visitor: &mut V) -> V::Result where V: VisitorMut {
 		visitor.visit_pre(self);
 
 		let result = match &self.kind {

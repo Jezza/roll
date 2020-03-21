@@ -8,14 +8,45 @@ use lang::UnaryOp;
 pub mod lang;
 
 pub fn evaluate_str(input: &str) -> i64 {
+	println!("{}", input);
 	let expression = lang::parse_expression(input);
 	evaluate_expression(input, &expression)
 }
 
-pub fn evaluate_expression(input: &str, expression: &Expression) -> i64 {
+fn roll_dice(roll_count: i64, faces: i64) -> Vec<i64> {
+	if roll_count == 0 {
+		return vec![0];
+	}
+	if roll_count < 0 {
+		panic!("Cannot roll negative number of dice. (left: {}, right: {})", roll_count, faces);
+	}
+	if faces < 1 {
+		panic!("Cannot roll die with zero or negative faces. (left: {}, right: {})", roll_count, faces);
+	}
+
 	use rand::distributions::Uniform;
 	use rand::distributions::Distribution;
 
+	let between = Uniform::new_inclusive(1, faces);
+	let mut rng = rand::thread_rng();
+
+	let mut rolls = Vec::with_capacity(roll_count as usize);
+
+	for _ in 0..roll_count {
+		let roll = between.sample(&mut rng);
+
+		rolls.push(roll);
+	}
+
+//	let result = rolls.iter().sum();
+
+//	println!("{}d{}: {:?} = {}", roll_count, faces, rolls, result);
+
+//	result
+	rolls
+}
+
+pub fn evaluate_expression(input: &str, expression: &Expression) -> i64 {
 	struct Evaluator<'a>(&'a str);
 
 	impl<'a> lang::Visitor for Evaluator<'a> {
@@ -26,40 +57,35 @@ pub fn evaluate_expression(input: &str, expression: &Expression) -> i64 {
 				let left = left.visit(self);
 				let right = right.visit(self);
 
-				match op {
+				let input = &self.0[expression.span.range()];
+
+				let result = match op {
 					BinaryOp::Dice => {
-						if left == 0 {
-							return 0;
+						let rolls = roll_dice(left, right);
+						let mut result = 0;
+						let mut buf = String::new();
+						use std::fmt::Write;
+						buf.push('[');
+						for (i, roll) in rolls.into_iter().enumerate() {
+							result += roll;
+							write!(&mut buf, "{}", roll);
+							if ((i + 1) as i64) != left {
+								buf.push_str(" + ");
+							}
 						}
-						if left < 0 {
-							panic!("Cannot roll negative number of dice. (left: {}, right: {})", left, right);
-						}
-						if right < 1 {
-							panic!("Cannot roll die with zero or negative faces. (left: {}, right: {})", left, right);
-						}
-
-						let between = Uniform::new_inclusive(1, right);
-						let mut rng = rand::thread_rng();
-
-						let mut rolls = Vec::with_capacity(left as usize);
-
-						for _ in 0..left {
-							let roll = between.sample(&mut rng);
-
-							rolls.push(roll);
-						}
-
-						let result = rolls.iter().sum();
-
-						println!("{}d{}: {:?} = {}", left, right, rolls, result);
-
-						result
-					}
+						buf.push(']');
+						println!("{} = {}d{} {} = {}", input, left, right, buf, result);
+						return result;
+					},
 					BinaryOp::Multiply => left * right,
 					BinaryOp::Divide => left / right,
 					BinaryOp::Minus => left - right,
 					BinaryOp::Add => left + right,
-				}
+				};
+
+				println!("{} = {}", input, result);
+
+				result
 			} else {
 				unreachable!()
 			}
@@ -68,6 +94,7 @@ pub fn evaluate_expression(input: &str, expression: &Expression) -> i64 {
 		fn visit_unary(&mut self, expression: &Expression) -> Self::Result {
 			if let ExpressionKind::Unary(op, expr) = &expression.kind {
 				let result = expr.visit(self);
+				println!("{} = {}", &self.0[expression.span.range()], result);
 
 				match op {
 					UnaryOp::Negative => -result

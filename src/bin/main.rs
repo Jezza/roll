@@ -1,8 +1,6 @@
 use roll::evaluate_str;
 
 fn main() {
-	// @TODO jezza - 13 Jan. 2020: Add custom spans so we know the source range for each expression. 1d6 + 3d(1d9 + 1d10 + 5)
-	// @TODO jezza - 13 Jan. 2020: Add support for roll reporting in custom spans. 1d6 + 3d(1d9 = [9] + 1d10 = [2] + 5)
 	// @TODO jezza - 13 Jan. 2020: Add custom dice. 1d{5,6}
 	// @TODO jezza - 13 Jan. 2020: Add permutations. 1d[5,6]
 	// @TODO jezza - 13 Jan. 2020: Add power operator. 2 ^ 2d2
@@ -30,6 +28,7 @@ fn main() {
 //	let result = evaluate_expression(&expression);
 //	println!("Result: {}", result);
 
-	let result = evaluate_str("2d(2 * 2)");
+//	let result = evaluate_str("2d(2 * 2)");
+	let result = evaluate_str("1d6 + 3d(1d9 + 1d10 + 5)");
 	println!("Result: {}", result);
 }
