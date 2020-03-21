@@ -65,16 +65,16 @@ pub fn evaluate_expression(input: &str, expression: &Expression) -> i64 {
 						let mut result = 0;
 						let mut buf = String::new();
 						use std::fmt::Write;
-						buf.push('[');
+						buf.push('(');
 						for (i, roll) in rolls.into_iter().enumerate() {
 							result += roll;
-							write!(&mut buf, "{}", roll);
+							write!(&mut buf, "{}", roll).unwrap();
 							if ((i + 1) as i64) != left {
 								buf.push_str(" + ");
 							}
 						}
-						buf.push(']');
-						println!("{} = {}d{} {} = {}", input, left, right, buf, result);
+						buf.push(')');
+						println!("{} = {}d{} = {} = {}", input, left, right, buf, result);
 						return result;
 					},
 					BinaryOp::Multiply => left * right,
